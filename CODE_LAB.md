@@ -1,6 +1,6 @@
 #  Code Lab: Deploy Your AI Agent to Production
 
-> **AICB-P1 · VinUniversity 2026**  
+> **AICB-P1 · VinUniversity 2026**
 > Thời gian: 3-4 giờ | Độ khó: Intermediate
 
 ##  Mục Tiêu
@@ -107,17 +107,17 @@ python app.py
 
 | Feature | Basic | Advanced | Tại sao quan trọng? |
 |---------|-------|----------|---------------------|
-| Config | Hardcode | Env vars | ... |
-| Health check |  |  | ... |
-| Logging | print() | JSON | ... |
-| Shutdown | Đột ngột | Graceful | ... |
+| Config | Hardcode | Env vars | Bảo mật (không lộ secret), linh hoạt thay đổi cấu hình tùy môi trường (dev/prod). |
+| Health check | Không có | Có (`/health`, `/ready`) | Giúp platform (Kubernetes, Railway) biết app có sống/sẵn sàng không để auto-restart hoặc route traffic. |
+| Logging | print() | JSON | Dễ dàng theo dõi, tìm kiếm, phân tích log tập trung thông qua các công cụ log aggregator. |
+| Shutdown | Đột ngột | Graceful | Đảm bảo không làm mất request đang xử lý dở, đóng kết nối DB an toàn khi tắt app. |
 
 ###  Checkpoint 1
 
-- [ ] Hiểu tại sao hardcode secrets là nguy hiểm
-- [ ] Biết cách dùng environment variables
-- [ ] Hiểu vai trò của health check endpoint
-- [ ] Biết graceful shutdown là gì
+- [x] Hiểu tại sao hardcode secrets là nguy hiểm
+- [x] Biết cách dùng environment variables
+- [x] Hiểu vai trò của health check endpoint
+- [x] Biết graceful shutdown là gì
 
 ---
 
@@ -144,9 +144,13 @@ cd ../../02-docker/develop
 **Nhiệm vụ:** Đọc `Dockerfile` và trả lời:
 
 1. Base image là gì?
+   - `python:3.11`
 2. Working directory là gì?
+   - `/app`
 3. Tại sao COPY requirements.txt trước?
+   - Để tận dụng Docker layer cache. Nếu code thay đổi nhưng requirements không đổi, Docker sẽ không phải cài lại dependencies từ đầu.
 4. CMD vs ENTRYPOINT khác nhau thế nào?
+   - `CMD` cung cấp giá trị mặc định cho container; dễ dàng bị ghi đè (override) khi chạy `docker run`. `ENTRYPOINT` thiết lập lệnh chính mà container sẽ thực thi, khó bị ghi đè hơn.
 
 ###  Exercise 2.2: Build và run
 
@@ -176,8 +180,11 @@ cd ../production
 
 **Nhiệm vụ:** Đọc `Dockerfile` và tìm:
 - Stage 1 làm gì?
+  - Builder stage: Cài đặt toàn bộ dependencies, bao gồm cả các build tools (`gcc`, `libpq-dev`), và cài đặt packages vào thư mục local của user.
 - Stage 2 làm gì?
+  - Runtime stage: Chỉ copy những packages đã cài đặt và source code từ builder stage vào một image sạch, tối giản. Thiết lập non-root user để bảo mật.
 - Tại sao image nhỏ hơn?
+  - Vì nó loại bỏ tất cả các build tools, cache, và file tạm từ Stage 1, chỉ giữ lại môi trường thực thi tối thiểu và các thư viện cần thiết.
 
 Build và so sánh:
 ```bash
@@ -208,10 +215,10 @@ curl http://localhost/ask -X POST \
 
 ###  Checkpoint 2
 
-- [ ] Hiểu cấu trúc Dockerfile
-- [ ] Biết lợi ích của multi-stage builds
-- [ ] Hiểu Docker Compose orchestration
-- [ ] Biết cách debug container (`docker logs`, `docker exec`)
+- [x] Hiểu cấu trúc Dockerfile
+- [x] Biết lợi ích của multi-stage builds
+- [x] Hiểu Docker Compose orchestration
+- [x] Biết cách debug container (`docker logs`, `docker exec`)
 
 ---
 
@@ -271,6 +278,7 @@ railway domain
 ```
 
 **Nhiệm vụ:** Test public URL với curl hoặc Postman.
+- Kết quả: API hoạt động, endpoint `/health` trả về status ok, endpoint `/ask` trả về câu trả lời từ mock LLM.
 
 Test:
 ```bash
@@ -301,6 +309,13 @@ cd ../render
 
 **Nhiệm vụ:** So sánh `render.yaml` với `railway.toml`. Khác nhau gì?
 
+| Đặc điểm | railway.toml | render.yaml |
+|----------|---------------|--------------|
+| **Phạm vi** | Một dịch vụ đơn lẻ (Single service) | Toàn bộ stack (Multi-service blueprint) |
+| **Mục đích** | Cấu hình build và start app | Infrastructure as Code (IaC) |
+| **Khả năng** | Tập trung vào runtime của app | Định nghĩa cả Web Service, Redis, Database, v.v. |
+| **Cách dùng** | Thường dùng cho một project nhỏ/đơn giản | Lý tưởng cho hệ thống phức tạp, cần tái lập môi trường |
+
 ###  Exercise 3.3: (Optional) GCP Cloud Run (15 phút)
 
 ```bash
@@ -311,12 +326,29 @@ cd ../production-cloud-run
 
 **Nhiệm vụ:** Đọc `cloudbuild.yaml` và `service.yaml`. Hiểu CI/CD pipeline.
 
+**1. `cloudbuild.yaml` (The "Process" - CI/CD Pipeline):**
+Định nghĩa quy trình tự động hóa từ code $\rightarrow$ production:
+- **Test:** Chạy `pytest` $\rightarrow$ Đảm bảo code ổn định trước khi build.
+- **Build:** Tạo Docker image $\rightarrow$ Gắn tag `COMMIT_SHA` (để rollback) và `latest`.
+- **Push:** Đẩy image lên Google Container Registry (GCR) $\rightarrow$ Lưu trữ image tập trung.
+- **Deploy:** Cập nhật Cloud Run $\rightarrow$ Kích hoạt phiên bản mới nhất lên môi trường thực tế.
+
+**2. `service.yaml` (The "State" - Infrastructure as Code):**
+Định nghĩa chi tiết cách app vận hành trên Cloud Run:
+- **Scaling:** `minScale: 1` (tránh cold start), `maxScale: 10` (giới hạn chi phí).
+- **Resources:** CPU 1 Core, RAM 512Mi $\rightarrow$ Tối ưu hóa tài nguyên.
+- **Security:** Dùng `secretKeyRef` để lấy API key từ Secret Manager $\rightarrow$ Tuyệt đối không lộ secret trong file config.
+- **Health Checks:** `livenessProbe` (`/health`) và `startupProbe` (`/ready`) $\rightarrow$ Tự động restart nếu app treo và chỉ nhận traffic khi đã sẵn sàng.
+
+**$\Rightarrow$ Luồng hoạt động:**
+`Git Push` $\rightarrow$ `Cloud Build` (`cloudbuild.yaml`) $\rightarrow$ `Docker Image` $\rightarrow$ `Cloud Run` (`service.yaml`) $\rightarrow$ `Live URL`
+
 ###  Checkpoint 3
 
-- [ ] Deploy thành công lên ít nhất 1 platform
-- [ ] Có public URL hoạt động
-- [ ] Hiểu cách set environment variables trên cloud
-- [ ] Biết cách xem logs
+- [x] Deploy thành công lên ít nhất 1 platform
+- [x] Có public URL hoạt động
+- [x] Hiểu cách set environment variables trên cloud
+- [x] Biết cách xem logs
 
 ---
 
@@ -339,8 +371,11 @@ cd ../../04-api-gateway/develop
 
 **Nhiệm vụ:** Đọc `app.py` và tìm:
 - API key được check ở đâu?
+  - Trong function `verify_api_key`, được sử dụng như một `Depends` cho endpoint `/ask`.
 - Điều gì xảy ra nếu sai key?
+  - Trả về lỗi `403 Forbidden` với thông báo "Invalid API key.". Nếu thiếu key sẽ trả về `401 Unauthorized`.
 - Làm sao rotate key?
+  - Thay đổi giá trị của environment variable `AGENT_API_KEY` và restart application.
 
 Test:
 ```bash
@@ -364,8 +399,9 @@ curl http://localhost:8000/ask -X POST \
 cd ../production
 ```
 
-**Nhiệm vụ:** 
+**Nhiệm vụ:**
 1. Đọc `auth.py` — hiểu JWT flow
+   - **Flow:** Login $\rightarrow$ Verify Creds $\rightarrow$ Issue JWT (signed with secret, has expiry) $\rightarrow$ Client sends JWT in `Authorization: Bearer` header $\rightarrow$ Server verifies signature and expiry $\rightarrow$ Extract user role/id.
 2. Lấy token:
 ```bash
 python app.py
@@ -388,8 +424,11 @@ curl http://localhost:8000/ask -X POST \
 
 **Nhiệm vụ:** Đọc `rate_limiter.py` và trả lời:
 - Algorithm nào được dùng? (Token bucket? Sliding window?)
+  - Sliding Window Counter.
 - Limit là bao nhiêu requests/minute?
+  - User: 10 req/min | Admin: 100 req/min.
 - Làm sao bypass limit cho admin?
+  - Sử dụng hai instance `RateLimiter` riêng biệt cho User và Admin; hệ thống sẽ chọn limiter dựa trên role của user được trích xuất từ JWT.
 
 Test:
 ```bash
@@ -413,7 +452,7 @@ Quan sát response khi hit limit.
 def check_budget(user_id: str, estimated_cost: float) -> bool:
     """
     Return True nếu còn budget, False nếu vượt.
-    
+
     Logic:
     - Mỗi user có budget $10/tháng
     - Track spending trong Redis
@@ -435,11 +474,11 @@ r = redis.Redis()
 def check_budget(user_id: str, estimated_cost: float) -> bool:
     month_key = datetime.now().strftime("%Y-%m")
     key = f"budget:{user_id}:{month_key}"
-    
+
     current = float(r.get(key) or 0)
     if current + estimated_cost > 10:
         return False
-    
+
     r.incrbyfloat(key, estimated_cost)
     r.expire(key, 32 * 24 * 3600)  # 32 days
     return True
@@ -449,10 +488,10 @@ def check_budget(user_id: str, estimated_cost: float) -> bool:
 
 ###  Checkpoint 4
 
-- [ ] Implement API key authentication
-- [ ] Hiểu JWT flow
-- [ ] Implement rate limiting
-- [ ] Implement cost guard với Redis
+- [x] Implement API key authentication
+- [x] Hiểu JWT flow
+- [x] Implement rate limiting
+- [x] Implement cost guard với Redis
 
 ---
 
@@ -523,17 +562,56 @@ def ready():
 ```python
 import signal
 import sys
+import threading
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Global state
+_server = None                          # Your HTTP/gRPC server instance
+_is_shutting_down = threading.Event()   # Flag checked by request handlers
 
 def shutdown_handler(signum, frame):
     """Handle SIGTERM from container orchestrator"""
-    # TODO:
+    logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+
     # 1. Stop accepting new requests
+    _is_shutting_down.set()             # Signal handlers to reject new work (503)
+    if _server:
+        _server.shutdown()              # Close the listening socket
+        logger.info("Server stopped accepting new requests")
+
     # 2. Finish current requests
-    # 3. Close connections
-    # 4. Exit
+    if _server:
+        _server.server_close()          # Block until all active handlers complete
+        logger.info("All in-flight requests completed")
+
+    # 3. Close connections (DB pools, caches, message queues, etc.)
+    _close_connections()
+    logger.info("All connections closed")
+
+    # 4. Exit cleanly (exit code 0 → orchestrator won't restart the pod)
+    logger.info("Shutdown complete. Exiting.")
+    sys.exit(0)
+
+
+def _close_connections():
+    """Release external resources before exit."""
+    # db_pool.close()
+    # mq_client.close()
+    # tracer.flush()
     pass
 
+
+def is_shutting_down() -> bool:
+    """Check inside request handlers to reject new work during drain."""
+    return _is_shutting_down.is_set()
+
+
+# Register for both SIGTERM (orchestrator) and SIGINT (Ctrl+C)
 signal.signal(signal.SIGTERM, shutdown_handler)
+signal.signal(signal.SIGINT,  shutdown_handler)
 ```
 
 Test:
@@ -562,22 +640,28 @@ cd ../production
 
 **Anti-pattern:**
 ```python
-#  State trong memory
-conversation_history = {}
+# State stored in Redis
+import redis
+
+# Initialize Redis client (adjust host/port as needed)
+r = redis.StrictRedis(host="redis", port=6379, db=0, decode_responses=True)
 
 @app.post("/ask")
 def ask(user_id: str, question: str):
-    history = conversation_history.get(user_id, [])
-    # ...
-```
-
-**Correct:**
-```python
-#  State trong Redis
-@app.post("/ask")
-def ask(user_id: str, question: str):
+    # Retrieve conversation history from Redis
     history = r.lrange(f"history:{user_id}", 0, -1)
-    # ...
+
+    # Process question with existing history (placeholder)
+    answer = generate_answer(question, history)
+
+    # Append new entry to history
+    r.rpush(f"history:{user_id}", f"Q: {question}")
+    r.rpush(f"history:{user_id}", f"A: {answer}")
+
+    # Optionally trim history to keep recent N entries
+    r.ltrim(f"history:{user_id}", -20, -1)
+
+    return {"answer": answer}
 ```
 
 Tại sao? Vì khi scale ra nhiều instances, mỗi instance có memory riêng.
@@ -621,11 +705,11 @@ Script này:
 
 ###  Checkpoint 5
 
-- [ ] Implement health và readiness checks
-- [ ] Implement graceful shutdown
-- [ ] Refactor code thành stateless
-- [ ] Hiểu load balancing với Nginx
-- [ ] Test stateless design
+- [x] Implement health và readiness checks
+- [x] Implement graceful shutdown
+- [x] Refactor code thành stateless
+- [x] Hiểu load balancing với Nginx
+- [x] Test stateless design
 
 ---
 
@@ -638,23 +722,23 @@ Build một production-ready AI agent từ đầu, kết hợp TẤT CẢ concep
 ###  Requirements
 
 **Functional:**
-- [ ] Agent trả lời câu hỏi qua REST API
-- [ ] Support conversation history
-- [ ] Streaming responses (optional)
+- [x] Agent trả lời câu hỏi qua REST API
+- [x] Support conversation history
+- [x] Streaming responses (optional)
 
 **Non-functional:**
-- [ ] Dockerized với multi-stage build
-- [ ] Config từ environment variables
-- [ ] API key authentication
-- [ ] Rate limiting (10 req/min per user)
-- [ ] Cost guard ($10/month per user)
-- [ ] Health check endpoint
-- [ ] Readiness check endpoint
-- [ ] Graceful shutdown
-- [ ] Stateless design (state trong Redis)
-- [ ] Structured JSON logging
-- [ ] Deploy lên Railway hoặc Render
-- [ ] Public URL hoạt động
+- [x] Dockerized với multi-stage build
+- [x] Config từ environment variables
+- [x] API key authentication
+- [x] Rate limiting (10 req/min per user)
+- [x] Cost guard ($10/month per user)
+- [x] Health check endpoint
+- [x] Readiness check endpoint
+- [x] Graceful shutdown
+- [x] Stateless design (state trong Redis)
+- [x] Structured JSON logging
+- [x] Deploy lên Railway hoặc Render
+- [x] Public URL hoạt động
 
 ### 🏗 Architecture
 
@@ -755,7 +839,7 @@ def ask(
     _rate_limit: None = Depends(check_rate_limit),
     _budget: None = Depends(check_budget)
 ):
-    # TODO: 
+    # TODO:
     # 1. Get conversation history from Redis
     # 2. Call LLM
     # 3. Save to Redis
@@ -912,19 +996,19 @@ Bạn đã:
 
 ##  Q&A
 
-**Q: Tôi không có credit card, có thể deploy không?**  
+**Q: Tôi không có credit card, có thể deploy không?**
 A: Có! Railway cho $5 credit, Render có 750h free tier.
 
-**Q: Mock LLM khác gì với OpenAI thật?**  
+**Q: Mock LLM khác gì với OpenAI thật?**
 A: Mock trả về canned responses, không gọi API. Để dùng OpenAI thật, set `OPENAI_API_KEY` trong env.
 
-**Q: Làm sao debug khi container fail?**  
+**Q: Làm sao debug khi container fail?**
 A: `docker logs <container_id>` hoặc `docker exec -it <container_id> /bin/sh`
 
-**Q: Redis data mất khi restart?**  
+**Q: Redis data mất khi restart?**
 A: Dùng volume: `volumes: - redis-data:/data` trong docker-compose.
 
-**Q: Làm sao scale trên Railway/Render?**  
+**Q: Làm sao scale trên Railway/Render?**
 A: Railway: `railway scale <replicas>`. Render: Dashboard → Settings → Instances.
 
 ---
