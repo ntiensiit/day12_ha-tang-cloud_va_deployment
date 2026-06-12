@@ -1,26 +1,26 @@
 # Deployment Information
 
 ## Public URL
-[INSERT YOUR PUBLIC DEPLOYMENT URL, e.g., https://my-production-agent.up.railway.app]
+https://my-production-agent-latest.onrender.com
 
 ## Platform
-[INSERT PLATFORM NAME, e.g., Railway / Render / Cloud Run]
+Render
 
 ## Test Commands
 
 ### Health Check
 ```bash
-curl [INSERT YOUR PUBLIC DEPLOYMENT URL, e.g., https://my-production-agent.up.railway.app]/health
+curl https://my-production-agent-latest.onrender.com/health
 ```
 
 ### Readiness Check
 ```bash
-curl [INSERT YOUR PUBLIC DEPLOYMENT URL, e.g., https://my-production-agent.up.railway.app]/ready
+curl https://my-production-agent-latest.onrender.com/ready
 ```
 
 ### API Test (with authentication)
 ```bash
-curl -X POST [INSERT YOUR PUBLIC DEPLOYMENT URL, e.g., https://my-production-agent.up.railway.app]/ask \
+curl -X POST https://my-production-agent-latest.onrender.com/ask \
   -H "X-API-Key: admin-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"user_id": "test_user", "question": "Hello Agent!"}'

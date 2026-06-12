@@ -34,8 +34,8 @@
 ## Part 3: Cloud Deployment
 
 ### Exercise 3.1: Railway deployment
-- URL: [INSERT YOUR RAILWAY PUBLIC URL, e.g., https://my-production-agent.up.railway.app]
-- Screenshot: [INSERT LINK TO SCREENSHOT IN REPO, e.g., screenshots/dashboard.png]
+- URL: https://my-production-agent-latest.onrender.com
+- Screenshot: [SCREENSHOT IN REPO](screenshots/repo.png)
 
 ## Part 4: API Security
 
